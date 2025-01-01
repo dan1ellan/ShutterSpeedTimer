@@ -20,8 +20,8 @@ const uint8_t photodiode3_PIN = A2;
 
 const uint8_t button_PIN = 4;
 
-const int threshold = 20;
-const unsigned long timeOut = 5000;
+const int threshold = 30;
+const unsigned long timeOut = 10000;
 
 unsigned long timeOutStart;
 bool timeOutStarted = false;
@@ -33,10 +33,6 @@ unsigned long timeStart3;
 unsigned long time1;
 unsigned long time2;
 unsigned long time3;
-
-unsigned long previousTime1;
-unsigned long previousTime2;
-unsigned long previousTime3;
 
 enum State {
   DETECTING,
@@ -63,17 +59,17 @@ void setup() {
 
 void detectLight() {
   int reading1 = analogRead(photodiode1_PIN);
-  if (reading1 > threshold && state1 == DETECTING) {
+  if (reading1 >= threshold && state1 == DETECTING) {
     timeStart1 = micros();
     state1 = MEASURING;
   }
   int reading2 = analogRead(photodiode2_PIN);
-  if (reading2 > threshold && state2 == DETECTING) {
+  if (reading2 >= threshold && state2 == DETECTING) {
     timeStart2 = micros();
     state2 = MEASURING;
   }
   int reading3 = analogRead(photodiode3_PIN);
-  if (reading3 > threshold && state3 == DETECTING) {
+  if (reading3 >= threshold && state3 == DETECTING) {
     timeStart3 = micros();
     state3 = MEASURING;
   }
@@ -99,6 +95,44 @@ void measureTime() {
   }
 }
 
+void runMeasurement() {
+  while (true) {
+    switch (state1) {
+      case DETECTING:
+        detectLight();
+        break;
+      case MEASURING:
+        measureTime();
+        break;
+    }
+
+    switch (state2) {
+      case DETECTING:
+        detectLight();
+        break;
+      case MEASURING:
+        measureTime();
+        break;
+    }
+
+    switch (state3) {
+      case DETECTING:
+        detectLight();
+        break;
+      case MEASURING:
+        measureTime();
+        break;
+    }
+
+    if (state1 == RESULT && state2 == RESULT && state3 == RESULT) {
+      timeOutStart = millis();
+      timeOutStarted = true;
+      break;
+    }
+    buttonReset();
+  }
+}
+
 void updateDisplay() {
   display.clearDisplay();
   display.setTextSize(1);
@@ -112,9 +146,6 @@ void updateDisplay() {
     case DETECTING:
       display.println("Detecting...");
       break;
-    case MEASURING:
-      display.println("Measuring...");
-      break;
     case RESULT:
       display.print(time1 / 1000.0);
       display.println(" ms");
@@ -125,9 +156,6 @@ void updateDisplay() {
   switch (state2) {
     case DETECTING:
       display.println("Detecting...");
-      break;
-    case MEASURING:
-      display.println("Measuring...");
       break;
     case RESULT:
       display.print(time2 / 1000.0);
@@ -140,9 +168,6 @@ void updateDisplay() {
     case DETECTING:
       display.println("Detecting...");
       break;
-    case MEASURING:
-      display.println("Measuring...");
-      break;
     case RESULT:
       display.print(time3 / 1000.0);
       display.println(" ms");
@@ -151,78 +176,28 @@ void updateDisplay() {
   display.display();
 }
 
-void toggleDisplay() {
+void buttonReset() {
   if (digitalRead(button_PIN) == LOW) {
     return;
   }
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(45, 0);
-  display.println("Record");
-
-  display.setCursor(0, 16);
-  display.print("Time 1: ");
-  display.print(previousTime1 / 1000.0);
-  display.println(" ms");
-
-  display.setCursor(0, 32);
-  display.print("Time 2: ");
-  display.print(previousTime2 / 1000.0);
-  display.println(" ms");
-
-  display.setCursor(0, 48);
-  display.print("Time 3: ");
-  display.print(previousTime3 / 1000.0);
-  display.println(" ms");
-
-  display.display();
-
-  delay(timeOut);
+  timeOutStarted = false;
+  state1 = DETECTING;
+  state2 = DETECTING;
+  state3 = DETECTING;
 }
 
 void loop() {
+  buttonReset();
   updateDisplay();
-  toggleDisplay();
-  if (state1 == RESULT && state2 == RESULT && state3 == RESULT && !timeOutStarted) {
-    timeOutStart = millis();
-    timeOutStarted = true;
+
+  if (!timeOutStarted) {
+    runMeasurement();
   }
 
   if (timeOutStarted && millis() - timeOutStart >= timeOut) {
     state1 = DETECTING;
     state2 = DETECTING;
     state3 = DETECTING;
-    previousTime1 = time1;
-    previousTime2 = time2;
-    previousTime3 = time3;
     timeOutStarted = false;
-  }
-
-  switch (state1) {
-    case DETECTING:
-      detectLight();
-      break;
-    case MEASURING:
-      measureTime();
-      break;
-  }
-
-  switch (state2) {
-    case DETECTING:
-      detectLight();
-      break;
-    case MEASURING:
-      measureTime();
-      break;
-  }
-
-  switch (state3) {
-    case DETECTING:
-      detectLight();
-      break;
-    case MEASURING:
-      measureTime();
-      break;
   }
 }
